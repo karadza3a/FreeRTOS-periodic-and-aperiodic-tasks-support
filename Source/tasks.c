@@ -70,6 +70,7 @@
 /* Standard includes. */
 #include <stdlib.h>
 #include <string.h>
+#include <printf.h>
 
 /* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE prevents task.h from redefining
 all the API functions to use the MPU wrappers.  That should only be done when
@@ -173,7 +174,7 @@ a statically allocated stack and a dynamically allocated TCB. */
 
 	#define taskSELECT_HIGHEST_PRIORITY_TASK()															\
 	{																									\
-	UBaseType_t uxTopPriority = uxTopReadyPriority;														\
+	UBaseType_t uxTopPriority = configMAX_PRIORITIES - 1;														\
 																										\
 		/* Find the highest priority queue that contains ready tasks. */								\
 		while( listLIST_IS_EMPTY( &( pxReadyTasksLists[ uxTopPriority ] ) ) )							\
@@ -184,7 +185,7 @@ a statically allocated stack and a dynamically allocated TCB. */
 																										\
 		/* listGET_OWNER_OF_NEXT_ENTRY indexes through the list, so the tasks of						\
 		the	same priority get an equal share of the processor time. */									\
-		listGET_OWNER_OF_NEXT_ENTRY( pxCurrentTCB, &( pxReadyTasksLists[ uxTopPriority ] ) );			\
+		pxCurrentTCB = listGET_OWNER_OF_HEAD_ENTRY( &( pxReadyTasksLists[ uxTopPriority ] ) );			\
 		uxTopReadyPriority = uxTopPriority;																\
 	} /* taskSELECT_HIGHEST_PRIORITY_TASK */
 
@@ -214,7 +215,7 @@ a statically allocated stack and a dynamically allocated TCB. */
 		/* Find the highest priority list that contains ready tasks. */								\
 		portGET_HIGHEST_PRIORITY( uxTopPriority, uxTopReadyPriority );								\
 		configASSERT( listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ uxTopPriority ] ) ) > 0 );		\
-		listGET_OWNER_OF_NEXT_ENTRY( pxCurrentTCB, &( pxReadyTasksLists[ uxTopPriority ] ) );		\
+		pxCurrentTCB = listGET_OWNER_OF_HEAD_ENTRY( &( pxReadyTasksLists[ uxTopPriority ] ) );		\
 	} /* taskSELECT_HIGHEST_PRIORITY_TASK() */
 
 	/*-----------------------------------------------------------*/
@@ -2766,44 +2767,59 @@ void vTaskSwitchContext( void )
 		switch. */
 		xYieldPending = pdTRUE;
 	}
-	else
-	{
+	else {
+		TickType_t currentTicks = xTaskGetTickCount();
+		BaseType_t periodicTaskCreationNeeded = pdFALSE;
+		for (int i = 0; i < taskNUM_MAX_PERIODIC_TASKS; i++) {
+			if (xPeriodicTasks[i].pxTaskCode != NULL && (currentTicks % xPeriodicTasks[i].xPeriod == 0)) {
+				if (xPeriodicTasks[i].xLastRunAt != currentTicks) {
+					periodicTaskCreationNeeded = pdTRUE;
+					break;
+				}
+			}
+		}
+
 		xYieldPending = pdFALSE;
 		traceTASK_SWITCHED_OUT();
 
-		#if ( configGENERATE_RUN_TIME_STATS == 1 )
+#if (configGENERATE_RUN_TIME_STATS == 1)
 		{
-				#ifdef portALT_GET_RUN_TIME_COUNTER_VALUE
-					portALT_GET_RUN_TIME_COUNTER_VALUE( ulTotalRunTime );
-				#else
-					ulTotalRunTime = portGET_RUN_TIME_COUNTER_VALUE();
-				#endif
+#ifdef portALT_GET_RUN_TIME_COUNTER_VALUE
+			portALT_GET_RUN_TIME_COUNTER_VALUE( ulTotalRunTime );
+#else
+			ulTotalRunTime = portGET_RUN_TIME_COUNTER_VALUE();
+#endif
 
-				/* Add the amount of time the task has been running to the
-				accumulated time so far.  The time the task started running was
-				stored in ulTaskSwitchedInTime.  Note that there is no overflow
-				protection here so count values are only valid until the timer
-				overflows.  The guard against negative values is to protect
-				against suspect run time stat counter implementations - which
-				are provided by the application, not the kernel. */
-				if( ulTotalRunTime > ulTaskSwitchedInTime )
-				{
-					pxCurrentTCB->ulRunTimeCounter += ( ulTotalRunTime - ulTaskSwitchedInTime );
-				}
-				else
-				{
-					mtCOVERAGE_TEST_MARKER();
-				}
-				ulTaskSwitchedInTime = ulTotalRunTime;
+			/* Add the amount of time the task has been running to the
+            accumulated time so far.  The time the task started running was
+            stored in ulTaskSwitchedInTime.  Note that there is no overflow
+            protection here so count values are only valid until the timer
+            overflows.  The guard against negative values is to protect
+            against suspect run time stat counter implementations - which
+            are provided by the application, not the kernel. */
+			if (ulTotalRunTime > ulTaskSwitchedInTime) {
+				pxCurrentTCB->ulRunTimeCounter += (ulTotalRunTime - ulTaskSwitchedInTime);
+			} else {
+				mtCOVERAGE_TEST_MARKER();
+			}
+			ulTaskSwitchedInTime = ulTotalRunTime;
 		}
-		#endif /* configGENERATE_RUN_TIME_STATS */
+#endif /* configGENERATE_RUN_TIME_STATS */
 
 		/* Check for stack overflow, if configured. */
 		taskCHECK_FOR_STACK_OVERFLOW();
 
 		/* Select a new task to run using either the generic C or port
 		optimised asm code. */
-		taskSELECT_HIGHEST_PRIORITY_TASK();
+		if (periodicTaskCreationNeeded == pdFALSE) {
+			taskSELECT_HIGHEST_PRIORITY_TASK();
+			printf((char *) "    xt %d  %s\n", currentTicks, pxCurrentTCB->pcTaskName);
+			fflush(stdout);
+		}else{
+			pxCurrentTCB = xTaskGetIdleTaskHandle();
+			uxTopReadyPriority = tskIDLE_PRIORITY;
+		}
+
 		traceTASK_SWITCHED_IN();
 
 		#if ( configUSE_NEWLIB_REENTRANT == 1 )
@@ -4800,6 +4816,28 @@ const TickType_t xConstTickCount = xTickCount;
 	#endif /* INCLUDE_vTaskSuspend */
 }
 
+void vTaskPeriodicCreate(	TaskFunction_t pxTaskCode,
+								   const char * const pcName,
+								   const uint16_t usStackDepth,
+								   void * const pvParameters,
+								   UBaseType_t uxPriority,
+								   TaskHandle_t * const pxCreatedTask,
+								   const TickType_t xPeriod)
+{
+	for(int i = 0; i<taskNUM_MAX_PERIODIC_TASKS; i++){
+		if(xPeriodicTasks[i].pxTaskCode == NULL){
+			xPeriodicTasks[i].pxTaskCode = pxTaskCode;
+			xPeriodicTasks[i].pcName = pcName;
+			xPeriodicTasks[i].usStackDepth = usStackDepth;
+			xPeriodicTasks[i].pvParameters = pvParameters;
+			xPeriodicTasks[i].uxPriority = uxPriority;
+			xPeriodicTasks[i].pxCreatedTask = pxCreatedTask;
+			xPeriodicTasks[i].xPeriod = xPeriod;
+			xPeriodicTasks[i].xLastRunAt = 1;
+			break;
+		}
+	}
+}
 
 #ifdef FREERTOS_MODULE_TEST
 	#include "tasks_test_access_functions.h"

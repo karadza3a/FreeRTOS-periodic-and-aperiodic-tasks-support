@@ -1,0 +1,7 @@
+.idea/*
+cmake-build-debug/*
+Python/*.pyc
+Python/__pycache__
+Python/out.txt
+Python/out-parsed.txt
+*.DS_Store
