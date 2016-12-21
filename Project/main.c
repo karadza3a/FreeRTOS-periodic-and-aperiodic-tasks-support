@@ -20,15 +20,12 @@ void vExampleTask(void *pvParameters){
     vTaskDelete(NULL);
 }
 
-char* name1 = "1";
-char* name2 = "2";
-char* name3 = "3";
-
 int main(void)
 {
-    vTaskPeriodicCreate( vExampleTask, name1, configMINIMAL_STACK_SIZE, name1, 3, NULL, 100);
-    vTaskPeriodicCreate( vExampleTask, name2, configMINIMAL_STACK_SIZE, name2, 3, NULL, 150);
-    vTaskPeriodicCreate( vExampleTask, name3, configMINIMAL_STACK_SIZE, name3, 4, NULL, 602);
+    vTaskPeriodicCreate( vExampleTask, "1", configMINIMAL_STACK_SIZE, "1", 3, NULL, 150);
+    vTaskPeriodicCreate( vExampleTask, "2", configMINIMAL_STACK_SIZE, "2", 3, NULL, 100);
+    vTaskPeriodicCreate( vExampleTask, "3", configMINIMAL_STACK_SIZE, "3", 3, NULL, 150);
+    vTaskPeriodicCreate( vExampleTask, "4", configMINIMAL_STACK_SIZE, "4", 4, NULL, 602);
 
     vTaskStartScheduler();
 
@@ -44,25 +41,4 @@ void vAssertCalled( unsigned long ulLine, const char * const pcFileName )
     }
     taskEXIT_CRITICAL();
     exit(-1);
-}
-
-void vApplicationIdleHook(){
-    TickType_t currentTicks = xTaskGetTickCount();
-    for(int i = 0; i<taskNUM_MAX_PERIODIC_TASKS; i++){
-        if(xPeriodicTasks[i].pxTaskCode != NULL && (currentTicks % xPeriodicTasks[i].xPeriod == 0)){
-            if (xPeriodicTasks[i].xLastRunAt != currentTicks) {
-                xPeriodicTasks[i].xLastRunAt = currentTicks;
-                    printf( ( char * ) "task %s created at %d\n" , xPeriodicTasks[i].pcName, currentTicks );
-                    fflush( stdout );
-                xTaskCreate(
-                        xPeriodicTasks[i].pxTaskCode,
-                        xPeriodicTasks[i].pcName,
-                        xPeriodicTasks[i].usStackDepth,
-                        xPeriodicTasks[i].pvParameters,
-                        xPeriodicTasks[i].uxPriority,
-                        xPeriodicTasks[i].pxCreatedTask
-                );
-            }
-        }
-    }
 }
