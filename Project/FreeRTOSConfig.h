@@ -45,7 +45,7 @@
 
 #define configMAX_PRIORITIES		( 10 )
 
-#define configGENERATE_RUN_TIME_STATS		1
+#define configGENERATE_RUN_TIME_STATS		0
 
 /* Set the following definitions to 1 to include the API function, or zero
 to exclude the API function.  In most cases the linker will remove unused

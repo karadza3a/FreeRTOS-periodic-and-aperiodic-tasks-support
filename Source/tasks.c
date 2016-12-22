@@ -71,6 +71,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <printf.h>
+#include <math.h>
 
 /* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE prevents task.h from redefining
 all the API functions to use the MPU wrappers.  That should only be done when
@@ -361,8 +362,27 @@ typedef struct tskTaskControlBlock
 		uint8_t ucDelayAborted;
 	#endif
 	TickType_t xPeriod;
+	BaseType_t xIsAperiodic;
 
 } tskTCB;
+
+struct tskPeriodicTask{
+	TaskFunction_t pxTaskCode;
+	const char* pcName;
+	uint16_t usStackDepth;
+	void* pvParameters;
+	UBaseType_t uxPriority;
+	TaskHandle_t* pxCreatedTask;
+	TickType_t xPeriod;
+	TickType_t xLastRunAt;
+} xPeriodicTasks[taskNUM_MAX_PERIODIC_TASKS];
+
+struct tskPollingServer {
+	UBaseType_t uxPriority;
+	TickType_t xPeriod;
+	TickType_t xCapacity;
+	TickType_t xCapacityLeft;
+} xPollingServer;
 
 /* The old tskTCB name is maintained above then typedefed to the new TCB_t name
 below to enable the use of older kernel aware debuggers. */
@@ -574,7 +594,8 @@ static void prvInitialiseNewTask( 	TaskFunction_t pxTaskCode,
 									TaskHandle_t * const pxCreatedTask,
 									TCB_t *pxNewTCB,
 									const MemoryRegion_t * const xRegions,
-                                    const TickType_t xPeriod ) PRIVILEGED_FUNCTION; /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+                                    const TickType_t xPeriod,
+								 	const BaseType_t xAperiodic ) PRIVILEGED_FUNCTION; /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
 
 /*
  * Called after a new task has been created and initialised to place the task
@@ -676,13 +697,14 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 
 #if( configSUPPORT_DYNAMIC_ALLOCATION == 1 )
 
-	BaseType_t xTaskCreateP( TaskFunction_t pxTaskCode,
-							 const char * const pcName,
-							 const uint16_t usStackDepth,
-							 void * const pvParameters,
-							 UBaseType_t uxPriority,
-							 TaskHandle_t * const pxCreatedTask,
-						   	 const TickType_t xPeriod ) /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+	BaseType_t xTaskCreateSuper( TaskFunction_t pxTaskCode,
+                                 const char * const pcName,
+                                 const uint16_t usStackDepth,
+                                 void * const pvParameters,
+                                 UBaseType_t uxPriority,
+                                 TaskHandle_t * const pxCreatedTask,
+                                 const TickType_t xPeriod,
+                                 const BaseType_t xAperiodic ) /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
 	{
 	TCB_t *pxNewTCB;
 	BaseType_t xReturn;
@@ -754,7 +776,7 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 			#endif /* configSUPPORT_STATIC_ALLOCATION */
 
 			prvInitialiseNewTask( pxTaskCode, pcName, ( uint32_t ) usStackDepth, pvParameters,
-                                  uxPriority, pxCreatedTask, pxNewTCB, NULL, xPeriod);
+                                  uxPriority, pxCreatedTask, pxNewTCB, NULL, xPeriod, xAperiodic);
 			prvAddNewTaskToReadyList( pxNewTCB );
 			xReturn = pdPASS;
 		}
@@ -769,14 +791,34 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 #endif /* configSUPPORT_DYNAMIC_ALLOCATION */
 /*-----------------------------------------------------------*/
 
-BaseType_t xTaskCreate(	TaskFunction_t pxTaskCode,
+BaseType_t xTaskCreate(	   TaskFunction_t pxTaskCode,
 						   const char * const pcName,
 						   const uint16_t usStackDepth,
 						   void * const pvParameters,
 						   UBaseType_t uxPriority,
 						   TaskHandle_t * const pxCreatedTask ) /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
 {
-	return xTaskCreateP(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pxCreatedTask, 666);
+	return xTaskCreateSuper(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pxCreatedTask, 666, pdFALSE);
+}
+
+BaseType_t xTaskPeriodicCreate(	   TaskFunction_t pxTaskCode,
+								   const char * const pcName,
+								   const uint16_t usStackDepth,
+								   void * const pvParameters,
+								   UBaseType_t uxPriority,
+								   TaskHandle_t * const pxCreatedTask,
+								   const TickType_t xPeriod) /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+{
+	return xTaskCreateSuper(pxTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pxCreatedTask, xPeriod, pdFALSE);
+}
+
+BaseType_t xTaskAperiodicCreate(   TaskFunction_t pxTaskCode,
+								   const char * const pcName,
+								   const uint16_t usStackDepth,
+								   void * const pvParameters,
+								   TaskHandle_t * const pxCreatedTask) /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+{
+	return xTaskCreateSuper(pxTaskCode, pcName, usStackDepth, pvParameters, xPollingServer.uxPriority, pxCreatedTask, 999, pdTRUE);
 }
 
 static void prvInitialiseNewTask( 	TaskFunction_t pxTaskCode,
@@ -787,7 +829,8 @@ static void prvInitialiseNewTask( 	TaskFunction_t pxTaskCode,
 									TaskHandle_t * const pxCreatedTask,
 									TCB_t *pxNewTCB,
 									const MemoryRegion_t * const xRegions,
-								 	const TickType_t xPeriod) /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
+								 	const TickType_t xPeriod,
+								 	const BaseType_t xAperiodic) /*lint !e971 Unqualified char types are allowed for strings and single characters only. */
 {
 StackType_t *pxTopOfStack;
 UBaseType_t x;
@@ -873,6 +916,7 @@ UBaseType_t x;
 	}
 
 	pxNewTCB->xPeriod = xPeriod;
+	pxNewTCB->xIsAperiodic = xAperiodic;
 	pxNewTCB->uxPriority = uxPriority;
 	#if ( configUSE_MUTEXES == 1 )
 	{
@@ -2828,36 +2872,100 @@ void vTaskSwitchContext( void )
 		/* Select a new task to run using either the generic C or port
 		optimised asm code. */
 		if (periodicTaskCreationNeeded == pdFALSE) {
-			/// taskSELECT_HIGHEST_PRIORITY_TASK()
 
-				UBaseType_t uxTopPriority = configMAX_PRIORITIES - 1;
-				/* Find the highest priority queue that contains ready tasks. */
-				while (listLIST_IS_EMPTY(&(pxReadyTasksLists[uxTopPriority]))) {
-					configASSERT(uxTopPriority);
-					--uxTopPriority;
+			/// reset polling server capacity
+			{
+				TickType_t newCapacity;
+				if (currentTicks % xPollingServer.xPeriod == 0) {
+					newCapacity = xPollingServer.xCapacity;
+				} else {
+					newCapacity = xPollingServer.xCapacityLeft;
 				}
-
-				List_t* list = &pxReadyTasksLists[uxTopPriority];
-
+				xPollingServer.xCapacityLeft = 0;
+				List_t *list = &pxReadyTasksLists[xPollingServer.uxPriority];
 				struct xLIST_ITEM *current = listGET_HEAD_ENTRY(list);
-				TickType_t minPeriod = ((TCB_t *) listGET_LIST_ITEM_OWNER(current))->xPeriod + 1;
-				TCB_t *minPeriodTask = NULL;
-
 				for (; current != listGET_END_MARKER(list); current = listGET_NEXT(current)) {
 					TCB_t *task = listGET_LIST_ITEM_OWNER(current);
-					if (task->xPeriod < minPeriod) {
-						minPeriodTask = task;
-						minPeriod = task->xPeriod;
+					if (task->xIsAperiodic == pdTRUE) {
+						xPollingServer.xCapacityLeft = newCapacity;
+						break;
 					}
 				}
+			}
 
-				pxCurrentTCB = minPeriodTask;
-				uxTopReadyPriority = uxTopPriority;
+
+			/// taskSELECT_HIGHEST_PRIORITY_TASK()
+			/// /// Find the highest priority queue that contains ready tasks.
+            UBaseType_t uxTopPriority = configMAX_PRIORITIES - 1;
+            while (pdTRUE) {
+                BaseType_t empty = listLIST_IS_EMPTY(&(pxReadyTasksLists[uxTopPriority]));
+                if (!empty) {
+                    // has some ready tasks
+
+                    // aperiodic tasks must have the same priority as the polling server
+                    if (xPollingServer.uxPriority != uxTopPriority) // if true, tasks must be periodic
+                        break;
+
+                    // if server has capacity, some task will be run anyway
+                    if (xPollingServer.xCapacityLeft > 0)
+                        break;
+
+                    // else, check if there are any periodic tasks
+                    BaseType_t periodicTaskFound = pdFALSE;
+                    List_t *list = &(pxReadyTasksLists[uxTopPriority]);
+                    struct xLIST_ITEM *current = listGET_HEAD_ENTRY(list);
+                    for (; current != listGET_END_MARKER(list); current = listGET_NEXT(current)) {
+                        TCB_t *task = listGET_LIST_ITEM_OWNER(current);
+                        if (task->xIsAperiodic == pdFALSE) {
+                            periodicTaskFound = pdTRUE;
+                            break;
+                        }
+                    }
+                    if (periodicTaskFound == pdTRUE)
+                        break;
+                }
+                configASSERT(uxTopPriority);
+                --uxTopPriority;
+            }
+
+			/// /// Find task with highest frequency
+            List_t* list = &pxReadyTasksLists[uxTopPriority];
+
+            struct xLIST_ITEM *current = listGET_HEAD_ENTRY(list);
+            TickType_t minPeriod = ((TCB_t *) listGET_LIST_ITEM_OWNER(current))->xPeriod + 1;
+            TCB_t *minPeriodTask = NULL;
+			BaseType_t numAperiodic = 0;
+			TCB_t *aperiodicTask = NULL;
+
+            for (; current != listGET_END_MARKER(list); current = listGET_NEXT(current)) {
+                TCB_t *task = listGET_LIST_ITEM_OWNER(current);
+                if (task->xIsAperiodic == pdFALSE && task->xPeriod < minPeriod) {
+                    minPeriodTask = task;
+                    minPeriod = task->xPeriod;
+                }else if (task->xIsAperiodic == pdTRUE){
+					++numAperiodic;
+					if(!aperiodicTask)
+						aperiodicTask = task;
+				}
+			}
+
+			/// /// Find task with highest frequency (maybe it's the server)
+			if (xPollingServer.uxPriority == uxTopPriority &&
+					xPollingServer.xCapacityLeft > 0 &&
+					numAperiodic > 0 &&
+					xPollingServer.xPeriod < minPeriod){
+				minPeriodTask = aperiodicTask;
+				--xPollingServer.xCapacityLeft;
+				printf((char *) "  cap %d\n", xPollingServer.xCapacityLeft);
+			}
+
+            pxCurrentTCB = minPeriodTask;
+            uxTopReadyPriority = uxTopPriority;
 
 			/// taskSELECT_HIGHEST_PRIORITY_TASK   END
 
-			printf((char *) "    xt %d  %s\n", currentTicks, pxCurrentTCB->pcTaskName);
-//			printf((char *) "    xt %d  %s   %d\n", currentTicks, pxCurrentTCB->pcTaskName, pxCurrentTCB->xPeriod);
+			printf((char *) "xt-%d-%s\n", currentTicks, pxCurrentTCB->pcTaskName);
+//			printf((char *) "xt %d  %s   %d\n", currentTicks, pxCurrentTCB->pcTaskName, pxCurrentTCB->xPeriod);
 			fflush(stdout);
 		}else{
 			pxCurrentTCB = xTaskGetIdleTaskHandle();
@@ -4860,6 +4968,15 @@ const TickType_t xConstTickCount = xTickCount;
 	#endif /* INCLUDE_vTaskSuspend */
 }
 
+void vInitializePollingServer(UBaseType_t uxPriority,
+							  TickType_t xPeriod,
+							  TickType_t xCapacity) {
+	xPollingServer.uxPriority = uxPriority;
+	xPollingServer.xPeriod = xPeriod;
+	xPollingServer.xCapacity = xCapacity;
+	xPollingServer.xCapacityLeft = 0;
+}
+
 void vTaskPeriodicCreate(TaskFunction_t pxTaskCode,
 						 const char *const pcName,
 						 const uint16_t usStackDepth,
@@ -4890,7 +5007,7 @@ void vApplicationIdleHook() {
 				xPeriodicTasks[i].xLastRunAt = currentTicks;
 				printf((char *) "task %s created at %d\n", xPeriodicTasks[i].pcName, currentTicks);
 				fflush(stdout);
-				xTaskCreateP(
+				xTaskPeriodicCreate(
 						xPeriodicTasks[i].pxTaskCode,
 						xPeriodicTasks[i].pcName,
 						xPeriodicTasks[i].usStackDepth,

@@ -2260,17 +2260,6 @@ void *pvTaskIncrementMutexHeldCount( void ) PRIVILEGED_FUNCTION;
 
 #define taskNUM_MAX_PERIODIC_TASKS 15
 
-struct tskPeriodicTask{
-	TaskFunction_t pxTaskCode;
-	const char* pcName;
-	uint16_t usStackDepth;
-	void* pvParameters;
-	UBaseType_t uxPriority;
-	TaskHandle_t* pxCreatedTask;
-    TickType_t xPeriod;
-    TickType_t xLastRunAt;
-} xPeriodicTasks[taskNUM_MAX_PERIODIC_TASKS];
-
 void vTaskPeriodicCreate(	TaskFunction_t pxTaskCode,
 							 const char * const pcName,
 							 const uint16_t usStackDepth,
@@ -2278,6 +2267,16 @@ void vTaskPeriodicCreate(	TaskFunction_t pxTaskCode,
 							 UBaseType_t uxPriority,
 							 TaskHandle_t * const pxCreatedTask,
 							 const TickType_t xPeriod);
+
+BaseType_t xTaskAperiodicCreate(   TaskFunction_t pxTaskCode,
+								   const char * const pcName,
+								   const uint16_t usStackDepth,
+								   void * const pvParameters,
+								   TaskHandle_t * const pxCreatedTask);
+
+void vInitializePollingServer(UBaseType_t uxPriority,
+							  TickType_t xPeriod,
+							  TickType_t xCapacity);
 
 #ifdef __cplusplus
 }
