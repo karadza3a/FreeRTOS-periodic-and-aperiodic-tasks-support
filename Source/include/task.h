@@ -2258,7 +2258,7 @@ eSleepModeStatus eTaskConfirmSleepModeStatus( void ) PRIVILEGED_FUNCTION;
  */
 void *pvTaskIncrementMutexHeldCount( void ) PRIVILEGED_FUNCTION;
 
-#define taskNUM_MAX_PERIODIC_TASKS 15
+#define taskNUM_MAX_PERIODIC_TASKS 5
 
 void vTaskPeriodicCreate(	TaskFunction_t pxTaskCode,
 							 const char * const pcName,
@@ -2277,7 +2277,21 @@ BaseType_t xTaskAperiodicCreate(   TaskFunction_t pxTaskCode,
 void vInitializePollingServer(UBaseType_t uxPriority,
 							  TickType_t xPeriod,
 							  TickType_t xCapacity);
+struct xTaskConfig{
+    TickType_t xPeriod;
+    TickType_t xLoad;
+    UBaseType_t xPriority;
+    void* pvTask;
+    char pcName[10];
+};
+extern struct xTaskConfig xTaskConfigs[10];
+extern UBaseType_t xTaskConfigsN;
+
+void vCanBeScheduled(UBaseType_t  n);
+void setPeriodicConfig(UBaseType_t i, UBaseType_t xPriority, TickType_t xPeriod, TickType_t xLoad, void* pvTask);
+void setPollingSConfig(UBaseType_t i, UBaseType_t xPriority, TickType_t xPeriod, TickType_t xLoad);
 void vSystemIdleHook();
+extern int vPrintf(const char *, ...);
 
 #ifdef __cplusplus
 }

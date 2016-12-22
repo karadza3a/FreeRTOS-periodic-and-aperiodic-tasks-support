@@ -70,7 +70,7 @@
 /* Standard includes. */
 #include <stdlib.h>
 #include <string.h>
-#include <printf.h>
+#include <stdio.h>
 #include <math.h>
 
 /* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE prevents task.h from redefining
@@ -1886,6 +1886,16 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 
 void vTaskStartScheduler( void )
 {
+
+	vInitializePollingServer(xTaskConfigs[0].xPriority, xTaskConfigs[0].xPeriod, xTaskConfigs[0].xLoad);
+	for (int i = 1; i < xTaskConfigsN; i++) {
+		vTaskPeriodicCreate(xTaskConfigs[i].pvTask,
+							(const char *const) xTaskConfigs[i].pcName, configMINIMAL_STACK_SIZE,
+							(void *const)(uintptr_t) xTaskConfigs[i].xLoad,
+							xTaskConfigs[i].xPriority, NULL,
+							xTaskConfigs[i].xPeriod);
+	}
+
 BaseType_t xReturn;
 
 	/* Add the idle task at the lowest priority. */
@@ -2956,17 +2966,14 @@ void vTaskSwitchContext( void )
 					xPollingServer.xPeriod < minPeriod){
 				minPeriodTask = aperiodicTask;
 				--xPollingServer.xCapacityLeft;
-				printf((char *) "  cap %d\n", xPollingServer.xCapacityLeft);
 			}
 
             pxCurrentTCB = minPeriodTask;
             uxTopReadyPriority = uxTopPriority;
 
 			/// taskSELECT_HIGHEST_PRIORITY_TASK   END
-
-			printf((char *) "xt-%d-%s\n", currentTicks, pxCurrentTCB->pcTaskName);
-//			printf((char *) "xt %d  %s   %d\n", currentTicks, pxCurrentTCB->pcTaskName, pxCurrentTCB->xPeriod);
-			fflush(stdout);
+			vPrintf((char *) "cap-%d-%d\n", currentTicks, xPollingServer.xCapacityLeft);
+			vPrintf((char *) "xt-%d-%s\n", currentTicks, pxCurrentTCB->pcTaskName);
 		}else{
 			pxCurrentTCB = xTaskGetIdleTaskHandle();
 			uxTopReadyPriority = tskIDLE_PRIORITY;
@@ -5019,6 +5026,40 @@ void vSystemIdleHook() {
 			}
 		}
 	}
+}
+
+struct xTaskConfig xTaskConfigs[10];
+UBaseType_t xTaskConfigsN;
+
+// https://wikimedia.org/api/rest_v1/media/math/render/svg/1c993bcea3acc65628cc14ced38bcd4de59a718e
+void vCanBeScheduled(UBaseType_t n) {
+	double sum = 0;
+	double hypBound = 1;
+	for (int i = 0; i < n; i++) {
+		double u = xTaskConfigs[i].xLoad / (double) xTaskConfigs[i].xPeriod;
+		sum += u;
+		hypBound *= (u + 1);
+	}
+	double bound = n * (pow(2, 1 / (double) n) - 1);
+
+	printf((char *) "\n      %f ?<= %f (%f ?<= 2)\n\n", sum, bound, hypBound);
+	fflush(stdout);
+}
+
+void setPeriodicConfig(UBaseType_t i, UBaseType_t xPriority, TickType_t xPeriod, TickType_t xLoad, void* pvTask) {
+	xTaskConfigs[i].pvTask = pvTask;
+	xTaskConfigs[i].xLoad = xLoad;
+	xTaskConfigs[i].xPeriod = xPeriod;
+	xTaskConfigs[i].xPriority = xPriority;
+	sprintf(xTaskConfigs[i].pcName, "per%lu", i);
+	if(i+1 > xTaskConfigsN)
+		xTaskConfigsN = i+1;
+}
+
+void setPollingSConfig(UBaseType_t i, UBaseType_t xPriority, TickType_t xPeriod, TickType_t xLoad) {
+	configASSERT(i == 0);
+	setPeriodicConfig(0, xPriority, xPeriod, xLoad, NULL);
+	sprintf(xTaskConfigs[i].pcName, "pSrv");
 }
 
 #ifdef FREERTOS_MODULE_TEST

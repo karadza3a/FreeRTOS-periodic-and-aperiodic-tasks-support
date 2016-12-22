@@ -38,7 +38,7 @@
 #define configUSE_TASK_NOTIFICATIONS			1
 
 /* Software timer related configuration options. */
-#define configUSE_TIMERS						1
+#define configUSE_TIMERS						0
 #define configTIMER_TASK_PRIORITY				( configMAX_PRIORITIES - 1 )
 #define configTIMER_QUEUE_LENGTH				20
 #define configTIMER_TASK_STACK_DEPTH			( configMINIMAL_STACK_SIZE * 2 )
@@ -50,21 +50,21 @@
 /* Set the following definitions to 1 to include the API function, or zero
 to exclude the API function.  In most cases the linker will remove unused
 functions anyway. */
-#define INCLUDE_vTaskPrioritySet				1
-#define INCLUDE_uxTaskPriorityGet				1
+#define INCLUDE_vTaskPrioritySet				0
+#define INCLUDE_uxTaskPriorityGet				0
 #define INCLUDE_vTaskDelete						1
-#define INCLUDE_vTaskSuspend					1
-#define INCLUDE_vTaskDelayUntil					1
-#define INCLUDE_vTaskDelay						1
+#define INCLUDE_vTaskSuspend					0
+#define INCLUDE_vTaskDelayUntil					0
+#define INCLUDE_vTaskDelay						0
 #define INCLUDE_uxTaskGetStackHighWaterMark 	0 /* Do not use this option on the PC port. */
 #define INCLUDE_xTaskGetSchedulerState			1
-#define INCLUDE_xTimerGetTimerDaemonTaskHandle	1
+#define INCLUDE_xTimerGetTimerDaemonTaskHandle	0
 #define INCLUDE_xTaskGetIdleTaskHandle			1
 #define INCLUDE_pcTaskGetTaskName				1
 #define INCLUDE_eTaskGetState					1
 #define INCLUDE_xSemaphoreGetMutexHolder		1
-#define INCLUDE_xTimerPendFunctionCall			1
-#define INCLUDE_xTaskAbortDelay					1
+#define INCLUDE_xTimerPendFunctionCall			0
+#define INCLUDE_xTaskAbortDelay					0
 #define INCLUDE_xTaskGetHandle					1
 
 /* It is a good idea to define configASSERT() while developing.  configASSERT()
