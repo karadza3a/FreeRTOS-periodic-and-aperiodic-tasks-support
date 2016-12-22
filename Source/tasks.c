@@ -4999,14 +4999,14 @@ void vTaskPeriodicCreate(TaskFunction_t pxTaskCode,
 	}
 }
 
-void vApplicationIdleHook() {
+void vSystemIdleHook() {
 	TickType_t currentTicks = xTaskGetTickCount();
 	for (int i = 0; i < taskNUM_MAX_PERIODIC_TASKS; i++) {
 		if (xPeriodicTasks[i].pxTaskCode != NULL && (currentTicks % xPeriodicTasks[i].xPeriod == 0)) {
 			if (xPeriodicTasks[i].xLastRunAt != currentTicks) {
 				xPeriodicTasks[i].xLastRunAt = currentTicks;
-				printf((char *) "task %s created at %d\n", xPeriodicTasks[i].pcName, currentTicks);
-				fflush(stdout);
+//				printf((char *) "task %s created at %d\n", xPeriodicTasks[i].pcName, currentTicks);
+//				fflush(stdout);
 				xTaskPeriodicCreate(
 						xPeriodicTasks[i].pxTaskCode,
 						xPeriodicTasks[i].pcName,

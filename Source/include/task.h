@@ -2277,6 +2277,7 @@ BaseType_t xTaskAperiodicCreate(   TaskFunction_t pxTaskCode,
 void vInitializePollingServer(UBaseType_t uxPriority,
 							  TickType_t xPeriod,
 							  TickType_t xCapacity);
+void vSystemIdleHook();
 
 #ifdef __cplusplus
 }

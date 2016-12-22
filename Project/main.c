@@ -8,15 +8,15 @@
 
 void vATask(void *pvParameters) {
     int sch = (int) pvParameters;
-    printf((char *) " ap start (sch %d) - %u\n", sch, (unsigned int) xTaskGetTickCount());
-    fflush(stdout);
+//    printf((char *) " ap start (sch %d) - %u\n", sch, (unsigned int) xTaskGetTickCount());
+//    fflush(stdout);
 
     for (int i = 0; i < 1000000; i++) {
         volatile int j = (volatile int) sqrt(i / 2 * 100);
     }
 
-    printf((char *) " ap stop (sch %d) - %u\n", sch, (unsigned int) xTaskGetTickCount());
-    fflush(stdout);
+//    printf((char *) " ap stop (sch %d) - %u\n", sch, (unsigned int) xTaskGetTickCount());
+//    fflush(stdout);
 
     vTaskDelete(NULL);
 }
@@ -28,9 +28,9 @@ void vExampleTask(void *pvParameters) {
     for (int i = 0; i < n; i++) {
         volatile int j = (volatile int) sqrt(i % 10 * 10000);
         int r = rand();    //returns a pseudo-random integer between 0 and RAND_MAX
-        if (r % 5000000 == 7) {
-            printf((char *) "ap-sch-at%d\n", xTaskGetTickCount());
-            fflush(stdout);
+        if (r % 10000000 == 7) {
+//            printf((char *) "ap-sch-at%d\n", xTaskGetTickCount());
+//            fflush(stdout);
             xTaskAperiodicCreate(vATask, "aperiodic", configMINIMAL_STACK_SIZE, (void *const) xTaskGetTickCount(), NULL);
         }
     }
@@ -108,4 +108,8 @@ void vAssertCalled(unsigned long ulLine, const char *const pcFileName) {
     }
     taskEXIT_CRITICAL();
     exit(-1);
+}
+
+void vApplicationIdleHook(){
+    vSystemIdleHook();
 }
