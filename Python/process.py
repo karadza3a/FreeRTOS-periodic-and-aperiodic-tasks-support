@@ -46,14 +46,31 @@ class ProcessorUsageParser:
         return self.output_text, self.time_max, self.i_max
 
 
-def process(lines):
-    pu = ProcessorUsageParser()
-    for l in lines:
-        pu.process_line(l)
+class CapacityParser:
+    def __init__(self):
+        self.r = re.compile("cap-(\d+)-(\d+)")
+        self.output_dict = {}
 
-    return pu.get_result()
+    def process_line(self, l):
+        groups = self.r.search(l)
+        if groups:
+            time, capacity = int(groups.group(1)), int(groups.group(2))
+            self.output_dict[time] = capacity
+
+    def get_result(self):
+        return self.output_dict
+
+
+def process(lines):
+    pu_parser = ProcessorUsageParser()
+    c_parser = CapacityParser()
+    for l in lines:
+        pu_parser.process_line(l)
+        c_parser.process_line(l)
+
+    return pu_parser, c_parser
 
 if __name__ == '__main__':
-    output, _, _ = process(fileinput.input())
-    for line in output:
+    pu_parser, _ = process(fileinput.input())
+    for line in pu_parser.output_text:
         print(line)
